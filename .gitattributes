@@ -1,0 +1,2 @@
+local-chromadb/index/*.pkl filter=lfs diff=lfs merge=lfs -text
+local-chromadb/index/*.bin filter=lfs diff=lfs merge=lfs -text
