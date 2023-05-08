@@ -1,5 +1,4 @@
 from flask import Flask, request
-import requests
 import chromaLocal
 from firebase_admin import credentials, firestore, initialize_app, storage
 from dotenv import load_dotenv
