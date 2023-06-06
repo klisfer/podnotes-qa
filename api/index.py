@@ -1,13 +1,13 @@
 from flask import Flask, request
 import chromaLocal
-from firebase_admin import credentials, firestore, initialize_app, storage
+import scrapeUrl
+from TextSummarisation import textSummarisation
+from PyPDF2 import PdfReader
+from io import BytesIO
+from Utils import DBFunctions
+import requests
 from dotenv import load_dotenv
 load_dotenv()
-
-
-cred = credentials.Certificate('./podnotes-ai-gcp-service-key.json')
-app = initialize_app(cred, {'storageBucket': 'podnotes-ai.appspot.com'})
-db = firestore.client()
 
 app = Flask(__name__)
 
@@ -26,7 +26,7 @@ async def create_vector_collection():
     """Function to summarise transcript"""
     query_podcast = request.args.get("podcast")
 
-    all_transcripts = getAllTranscripts(query_podcast)
+    all_transcripts = DBFunctions.getAllTranscripts(query_podcast)
     text = ''
     
     for file in all_transcripts:
@@ -49,23 +49,56 @@ async def get_query_response():
     return response
 
 
+@app.route("/summarise-text", methods=['GET'])
+async def summarise():
+    """Function to summarise transcript"""
+    # text = request.args.get("text")
 
+    summary = ''
+    if 'url' in request.args:
+        url = request.args.get("url")
+        content = ''
+        if url.lower().endswith('.pdf') is True:
+            content = await load_pdf(url)
+            summary = textSummarisation.summarize_large_text(content, 'workspace/summary.md')
+        else:
+            scrapedText = await scrapeUrl.scrape_url(url)
+            print('scrapedText',scrapedText)
+            content = scrapedText
+            summary = textSummarisation.summarize_large_text(content, 'workspace/summary.md')
+        save_db_results= await DBFunctions.save_summary(summary, 'aayush.chaubey674@gmail.com')
+        print(save_db_results)
+    # with open('workspace/episode.txt', 'r') as file:
+    #     contents = file.read()
+    #     summary = textSummarisation.summarize_large_text(contents.replace('\n',''), 'workspace/summary.txt')
+    return summary
+
+async def load_pdf(url):
+    response = requests.get(url)
+
+    # Make sure the request was successful
+    response.raise_for_status()
+
+    # Use BytesIO to handle the binary data that was downloaded
+    pdf_file = BytesIO(response.content)
+
+    # Use PyPDF2 to read the text content of the downloaded file
+    pdf_reader = PdfReader(pdf_file)
+
+    # Initialize an empty string to hold the content
+    content = ""
+
+    # Loop through all the pages and extract the text
+    
+    # number _of_pages = len(pdf_reader.pages)  # Use len(pdf.pages) instead of pdf.getNumPages()
+    for page in pdf_reader.pages:
+        content += page.extract_text()
+
+    print('pdf_content',content)
+    return content
 
 def read_file_contents(blob):
     return blob.download_as_text()
-
-def getAllTranscripts(search_keyword):
-    bucket = storage.bucket("podnotes-transcripts")
-    transcript_files = []
-
-    # Fetch all file blobs from Firebase Storage
-    all_blobs = bucket.list_blobs()
-
-    # Check if the blob's name contains 'huberman' and add it to the list
-    for blob in all_blobs:
-        if search_keyword in blob.name:
-            transcript_files.append(blob)
-    return transcript_files
 
 
 if __name__ == "__main__":

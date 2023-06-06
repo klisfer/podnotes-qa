@@ -11,3 +11,15 @@ venv/
 ENV/ 
 env.bak/ 
 venv.bak/ 
+llama-chromadb/chroma-collections.parquet
+llama-chromadb/chroma-embeddings.parquet
+local-chromadb/index/id_to_uuid_8662f1b6-74c3-96d8-24d4-054595aa2f35.pkl
+local-chromadb/index/index_8662f1b6-74c3-96d8-24d4-054595aa2f35.bin
+local-chromadb/index/index_metadata_8662f1b6-74c3-96d8-24d4-054595aa2f35.pkl
+local-chromadb/index/uuid_to_id_8662f1b6-74c3-96d8-24d4-054595aa2f35.pkl
+local-chromadb/raw-docs/langchain-docs-raw.jsonl
+local-chromadb/raw-docs/lex_fridman_podcast.jsonl
+local-chromadb/raw-docs/lex_fridman_podcast.txt
+models/ggml-stable-vicuna-13B.q4_2.bin
+models/llama-30b-ggml-model-q4_0.bin
+development.pem
