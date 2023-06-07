@@ -12,9 +12,7 @@ from bardapi import Bard
 import concurrent.futures
 from transformers import pipeline
 
-os.environ['_BARD_API_KEY']= 'XQj5bq5WaCn9nx5C7N5Vj3n8XZABAQhgBSyXEDFRwzEJgqZUQS3TDrJWApQJNuTm7TyCFw.'
 
-openai.api_key = "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"
 
 tokenizer = tiktoken.get_encoding('cl100k_base')
 
