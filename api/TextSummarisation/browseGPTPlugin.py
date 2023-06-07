@@ -8,8 +8,7 @@ from langchain.tools import AIPluginTool
 from langchain.chains.summarize import load_summarize_chain
 from langchain.document_loaders.base import Document
 from langchain.utilities import ApifyWrapper
-openai.api_key = "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"
-os.environ['OPENAI_API_KEY'] = "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"
+
 
 def chatgpt_browse_web(url):
     plugins = [ "https://gochitchat.ai/linkreader/openapi.yaml",
