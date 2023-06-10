@@ -68,7 +68,7 @@ async def summarise():
             print('scrapedText',scrapedText)
             content = scrapedText
             summary = textSummarisation.summarize_large_text(content, 'workspace/summary.md')
-        save_db_results= await DBFunctions.save_summary(summary, userEmail)
+        save_db_results= await DBFunctions.save_summary(content, summary, userEmail)
         print(save_db_results)
    
     # with open('workspace/episode.txt', 'r') as file:
