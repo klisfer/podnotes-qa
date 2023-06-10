@@ -92,6 +92,7 @@ async def summarise_upload():
             return 'No selected file', 400
          if file:
             filename = secure_filename(file.filename)
+            print(os.path.join('/tmp', filename))
             file.save(os.path.join('/tmp', filename))
             
             file_content = parse_file(os.path.join('/tmp', filename))
