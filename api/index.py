@@ -86,7 +86,7 @@ async def summarise_upload():
     # text = request.args.get("text")
 
     summary = ''
-    if 'file' in request.args :
+    if 'file' in request.files :
          file = request.files['file']
          if file.filename == '':
             return 'No selected file', 400
