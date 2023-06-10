@@ -80,8 +80,8 @@ async def summarise():
     #     summary = textSummarisation.summarize_large_text(contents.replace('\n',''), 'workspace/summary.txt')
     return summary
 
-@app.route("/summarise-text-upload", methods=['POST'])
-async def summarise():
+@app.route("/summarise-text", methods=['POST'])
+async def summarise_upload():
     """Function to summarise transcript"""
     # text = request.args.get("text")
 
