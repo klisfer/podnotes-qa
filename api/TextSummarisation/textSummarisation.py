@@ -9,6 +9,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.docstore.document import Document
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 from bardapi import Bard
+import math
 import concurrent.futures
 from transformers import pipeline
 from dotenv import load_dotenv
@@ -143,6 +144,7 @@ def summarize_large_text(input_text, output_file):
     max_token_size = 3200 
     text_chunks = chunk_text(input_text, max_token_size)
     max_output = 3200/len(text_chunks)
+    max_output = math.ceil(max_output)
     print("max token size", max_token_size, max_output)
     # split_index = len(text_chunks) // 2
     # texts = [text_chunks[i:i+4] for i in range(0, len(text_chunks), 4)]
