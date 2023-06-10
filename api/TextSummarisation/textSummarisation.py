@@ -112,20 +112,14 @@ def generate_summary(text):
 def refineSummary(text):
     token_limit = 3500
     token_length = tk_len(text)
-    output_length = "500-700"
     if token_length > token_limit:
+       print('token-limit', token_limit, token_length)
        text = text[:token_limit]
-    elif token_length > 3000 and token_length < token_limit:
-       output_length = "500-700"
-    elif token_length > 2000 and token_length < 3000:
-       output_length = "400-500"
-    elif token_length > 1000 and token_length < 2000:
-       output_length = "300-400"
-    elif token_length < 1000:
-       output_length = "200-300"
+       print('stripped', tk_len(text))
+   
 
 
-    prompt = f"this is the raw text that needs to be used to create a blog article in {output_length} words. Add subheaders bullet points to make the article easily digestable. Maintain the context. Give the output in md format. Add line breaks after headers \n \n " + text
+    prompt = f"this is the raw text that needs to be used to create a blog article in about 500 words. Add subheaders bullet points to make the article easily digestable. Maintain the context. Give the output in md format. Add line breaks after headers \n \n " + text
     print('refining summary', prompt)
     print('refining summary token count', tk_len(prompt))
     completion = openai.ChatCompletion.create(
