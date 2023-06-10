@@ -87,7 +87,7 @@ def format_fixer(text):
     print('summary-chunk', formatted_text)
     return formatted_text
 
-def generate_summary(text):
+def generate_summary(text, max_output):
     
     messages = [
         {"role": "system", "content": "You are a helpful assistant that extracts key information from text."},
@@ -97,7 +97,7 @@ def generate_summary(text):
     response = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
         messages=messages,
-        max_tokens=500,  # Adjust based on your desired summary length
+        max_tokens=max_output,  # Adjust based on your desired summary length
         n=4,
         stop=None,
         temperature=0.1,
@@ -141,30 +141,31 @@ def summarize_large_text(input_text, output_file):
     # Chunk the text into smaller parts
     input_text = input_text.replace('\n', '')
     max_token_size = 3200 
-    print("max token size", max_token_size)
     text_chunks = chunk_text(input_text, max_token_size)
+    max_output = 3200/len(text_chunks)
+    print("max token size", max_token_size, max_output)
     # split_index = len(text_chunks) // 2
-    texts = [text_chunks[i:i+4] for i in range(0, len(text_chunks), 4)]
-   
-    print(len(texts))
-    summaries_array = []
+    # texts = [text_chunks[i:i+4] for i in range(0, len(text_chunks), 4)]
+    summaries = [generate_summary(chunk, max_output) for chunk in text_chunks]
+    # print(len(texts))
+    # summaries_array = []
     # # Generate summaries for each chunk concurrently
-    for text_array in texts:
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            summaries = list(executor.map(generate_summary, text_array))
-            summaries_array.append(summaries)
-            print('summaries',len(summaries))
+    # for text_array in texts:
+    #     with concurrent.futures.ThreadPoolExecutor() as executor:
+    #         summaries = list(executor.map(generate_summary, text_array))
+    #         summaries_array.append(summaries)
+    #         print('summaries',len(summaries))
    
     
     # # Generate summaries for each chunk
     # summaries = [generate_summary(chunk) for chunk in text_chunks]
-    print('summaries',len(summaries_array))
-    summaries_array = [item for sublist in summaries_array for item in sublist]
+    # print('summaries',len(summaries_array))
+    # summaries_array = [item for sublist in summaries_array for item in sublist]
 
     # Combine the summaries into a single article
     article = "## Summary\n\n"
-    for idx, summary in enumerate(summaries_array, 1):
-        article +=  f" idx: {summary}  \n\n"
+    for idx, summary in enumerate(summaries, 1):
+        article +=  f" idx: {idx}:{summary}  \n\n"
 
     
     refinedSummary = refineSummary(article)
