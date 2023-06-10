@@ -6,6 +6,9 @@ from PyPDF2 import PdfReader
 from io import BytesIO
 from Utils import DBFunctions
 import requests
+import os
+from docx import Document
+from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -70,12 +73,59 @@ async def summarise():
             summary = textSummarisation.summarize_large_text(content, 'workspace/summary.md')
         save_db_results= await DBFunctions.save_summary(content, summary, userEmail)
         print(save_db_results)
-   
+ 
+        
     # with open('workspace/episode.txt', 'r') as file:
     #     contents = file.read()
     #     summary = textSummarisation.summarize_large_text(contents.replace('\n',''), 'workspace/summary.txt')
     return summary
 
+@app.route("/summarise-text", methods=['POST'])
+async def summarise():
+    """Function to summarise transcript"""
+    # text = request.args.get("text")
+
+    summary = ''
+    if 'file' in request.args :
+         file = request.files['file']
+         if file.filename == '':
+            return 'No selected file', 400
+         if file:
+            filename = secure_filename(file.filename)
+            file.save(os.path.join('/tmp', filename))
+            
+            file_content = parse_file(os.path.join('/tmp', filename))
+            
+            print(file_content)
+            
+            return 'File uploaded successfully', 200
+ 
+        
+    # with open('workspace/episode.txt', 'r') as file:
+    #     contents = file.read()
+    #     summary = textSummarisation.summarize_large_text(contents.replace('\n',''), 'workspace/summary.txt')
+    return summary
+
+def parse_file(filepath):
+    file_extension = os.path.splitext(filepath)[1]
+    
+    if file_extension == '.txt':
+        with open(filepath, 'r') as f:
+            return f.read()
+    elif file_extension == '.pdf':
+        with open(filepath, 'rb') as f:
+            pdf = PdfReader(f)
+            text = ""
+            for page in range(pdf.getNumPages()):
+                text += pdf.getPage(page).extractText()
+            return text
+    elif file_extension in ['.doc', '.docx']:
+        doc = Document(filepath)
+        text = '\n'.join([paragraph.text for paragraph in doc.paragraphs])
+        return text
+    else:
+        return "Unsupported file type"
+    
 async def load_pdf(url):
     response = requests.get(url)
 
