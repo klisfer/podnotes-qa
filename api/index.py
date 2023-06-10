@@ -55,9 +55,11 @@ async def summarise():
     # text = request.args.get("text")
 
     summary = ''
-    if 'url' in request.args:
+    if 'url' in request.args :
         url = request.args.get("url")
+        userEmail = request.args.get("userEmail")
         content = ''
+        print(url, userEmail)
         if url.lower().endswith('.pdf') is True:
             content = await load_pdf(url)
             summary = textSummarisation.summarize_large_text(content, 'workspace/summary.md')
@@ -66,8 +68,9 @@ async def summarise():
             print('scrapedText',scrapedText)
             content = scrapedText
             summary = textSummarisation.summarize_large_text(content, 'workspace/summary.md')
-        save_db_results= await DBFunctions.save_summary(summary, 'aayush.chaubey674@gmail.com')
+        save_db_results= await DBFunctions.save_summary(summary, userEmail)
         print(save_db_results)
+   
     # with open('workspace/episode.txt', 'r') as file:
     #     contents = file.read()
     #     summary = textSummarisation.summarize_large_text(contents.replace('\n',''), 'workspace/summary.txt')
@@ -76,20 +79,10 @@ async def summarise():
 async def load_pdf(url):
     response = requests.get(url)
 
-    # Make sure the request was successful
     response.raise_for_status()
-
-    # Use BytesIO to handle the binary data that was downloaded
     pdf_file = BytesIO(response.content)
-
-    # Use PyPDF2 to read the text content of the downloaded file
     pdf_reader = PdfReader(pdf_file)
-
-    # Initialize an empty string to hold the content
     content = ""
-
-    # Loop through all the pages and extract the text
-    
     # number _of_pages = len(pdf_reader.pages)  # Use len(pdf.pages) instead of pdf.getNumPages()
     for page in pdf_reader.pages:
         content += page.extract_text()
@@ -102,4 +95,4 @@ def read_file_contents(blob):
 
 
 if __name__ == "__main__":
-    app.run(debug=False, use_reloader=True, port=8080)
+    app.run(debug=False, use_reloader=False, port=8080)

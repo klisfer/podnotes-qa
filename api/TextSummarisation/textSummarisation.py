@@ -11,10 +11,10 @@ from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 from bardapi import Bard
 import concurrent.futures
 from transformers import pipeline
+from dotenv import load_dotenv
+load_dotenv()
 
-os.environ['_BARD_API_KEY']= 'XQj5bq5WaCn9nx5C7N5Vj3n8XZABAQhgBSyXEDFRwzEJgqZUQS3TDrJWApQJNuTm7TyCFw.'
-
-openai.api_key = "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"
+openai.api_key = os.environ["OPENAI_API_KEY"]
 
 tokenizer = tiktoken.get_encoding('cl100k_base')
 
