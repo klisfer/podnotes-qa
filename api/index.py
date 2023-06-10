@@ -9,10 +9,13 @@ import requests
 import os
 from docx import Document
 from werkzeug.utils import secure_filename
+from flask_cors import CORS
 from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
+CORS(app)
+app.config['MAX_CONTENT_LENGTH'] = 25 * 1024 * 1024
 
 @app.route('/')
 def home():
