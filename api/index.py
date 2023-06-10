@@ -64,7 +64,7 @@ async def summarise():
             content = await load_pdf(url)
             summary = textSummarisation.summarize_large_text(content, 'workspace/summary.md')
         else:
-            scrapedText = await scrapeUrl.scrape_url(url)
+            scrapedText = scrapeUrl.scrape_url(url)
             print('scrapedText',scrapedText)
             content = scrapedText
             summary = textSummarisation.summarize_large_text(content, 'workspace/summary.md')
@@ -95,4 +95,4 @@ def read_file_contents(blob):
 
 
 if __name__ == "__main__":
-    app.run(debug=False, use_reloader=False, port=8080)
+    app.run(debug=False, use_reloader=False, host="0.0.0.0",port=5000)
