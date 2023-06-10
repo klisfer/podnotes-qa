@@ -120,8 +120,8 @@ def parse_file(filepath):
         with open(filepath, 'rb') as f:
             pdf = PdfReader(f)
             text = ""
-            for page in range(pdf.getNumPages()):
-                text += pdf.getPage(page).extractText()
+            for page in pdf.pages:
+                text += page.extract_text()
             return text
     elif file_extension in ['.doc', '.docx']:
         doc = Document(filepath)
