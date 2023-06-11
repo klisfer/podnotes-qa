@@ -97,7 +97,7 @@ async def summarise_upload():
             return 'No selected file', 400
          if file:
             filename = secure_filename(file.filename)
-            print(os.path.join('/tmp', filename))
+            print(os.path.join('/tmp', filename), userEmail)
             file.save(os.path.join('/tmp', filename))
             
             file_content = parse_file(os.path.join('/tmp', filename))
@@ -106,8 +106,9 @@ async def summarise_upload():
             summary = textSummarisation.summarize_large_text(file_content, 'workspace/summary.md')
             print("uploaded summary", summary)
             save_db_results= await DBFunctions.save_summary(file_content, summary, userEmail)
-            return save_db_results, 200
- 
+            print(save_db_results)
+    return summary
+
         
     # with open('workspace/episode.txt', 'r') as file:
     #     contents = file.read()
