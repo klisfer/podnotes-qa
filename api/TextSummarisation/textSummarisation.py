@@ -10,6 +10,9 @@ from langchain.docstore.document import Document
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 from bardapi import Bard
 import math
+import torch
+from transformers import pipeline
+
 import concurrent.futures
 from transformers import pipeline
 from dotenv import load_dotenv
@@ -19,6 +22,10 @@ openai.api_key = os.environ["OPENAI_API_KEY"]
 
 tokenizer = tiktoken.get_encoding('cl100k_base')
 
+
+# Utility functions
+#  =================================================================
+#  =================================================================
 def count_tokens(text):
     token_count = len(tokenizer.encode(text))
     return token_count
@@ -88,12 +95,119 @@ def format_fixer(text):
     print('summary-chunk', formatted_text)
     return formatted_text
 
+def remove_conclusion(text):
+    while True:
+        # Find the start of the '## Conclusion' header
+        header_start = text.find('## Conclusion')
+
+        # If the header is not found, break the loop
+        if header_start == -1:
+            break
+
+        # Find the end of the paragraph following the header
+        paragraph_end = text.find('\n', header_start)
+
+        # If the end of the paragraph is not found, set it to the end of the text
+        if paragraph_end == -1:
+            paragraph_end = len(text)
+
+        # Remove the header and the following paragraph from the text
+        text = text[:header_start] + text[paragraph_end+1:]
+
+    return text
+
+# Main functions
+#  =================================================================
+#  =================================================================
+# def summarize_large_text(input_text, output_file):
+#     # Chunk the text into smaller parts
+#     input_text = input_text.replace('\n', '')
+#     max_token_size = 3200 
+#     text_chunks = chunk_text(input_text, max_token_size)
+   
+#     print("max token size", max_token_size)
+#     # split_index = len(text_chunks) // 2
+#     texts = [text_chunks[i:i+4] for i in range(0, len(text_chunks), 4)]
+#     summaries = [generate_summary(chunk) for chunk in text_chunks]
+#     # print(len(texts))
+#     summaries_array = []
+#     # # Generate summaries for each chunk concurrently
+#     for text_array in texts:
+#         with concurrent.futures.ThreadPoolExecutor() as executor:
+#             summaries = list(executor.map(generate_summary, text_array))
+#             summaries_array.append(summaries)
+#             print('summaries',len(summaries))
+   
+    
+#     # # Generate summaries for each chunk
+#     # summaries = [generate_summary(chunk) for chunk in text_chunks]
+#             print('summaries',len(summaries_array))
+#             summaries_array = [item for sublist in summaries_array for item in sublist]
+
+
+#     # Combine the summaries into a single article
+#     article = "## Summary\n\n"
+#     for idx, summary in enumerate(summaries_array, 1):
+#         article +=  f" idx: {idx}:{summary}  \n\n"
+
+#     token_limit = 3500
+#     token_length = tk_len(article)
+#     if int(token_length) > int(token_limit):
+#         refinedSummary = refineSummaryChapters(article)
+#     else:    
+#         refinedSummary = refineSummary(article)
+    
+#     print('refined summary', refinedSummary)
+#     # Save the article to a Markdown file
+#     # with open(output_file, "w", encoding='utf-8') as f:
+#     #     f.write(refinedSummary)
+#     return refinedSummary
+
+
+
+def summarize_large_text(input_text, output_file):
+    # Chunk the text into smaller parts
+    input_text = input_text.replace('\n', '')
+    max_token_size = 3200 
+    text_chunks = chunk_text(input_text, max_token_size)
+   
+    print("max token size", max_token_size)
+    
+    # Create smaller groups of 4 chunks each
+    chunk_groups = [text_chunks[i:i+3] for i in range(0, len(text_chunks), 3)]
+   
+    all_summaries = []
+    # Generate summaries for each group of chunks concurrently
+    for group in chunk_groups:
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            summaries = list(executor.map(generate_summary, group))
+            all_summaries.extend(summaries)  # add the new summaries to our list
+            print('summaries', len(summaries))
+
+    # Combine the summaries into a single article
+    article = "## Summary\n\n"
+    for idx, summary in enumerate(all_summaries, 1):  # enumerate starting from 1
+        article +=  f" idx: {idx}:{summary}  \n\n"
+
+    token_limit = 3500
+    token_length = tk_len(article)
+    if int(token_length) > int(token_limit):
+        refinedSummary = refineSummaryChapters(article)
+    else:    
+        refinedSummary = refineSummary(article)
+    
+    print('refined summary', refinedSummary)
+    # Save the article to a Markdown file
+    # with open(output_file, "w", encoding='utf-8') as f:
+    #     f.write(refinedSummary)
+    return refinedSummary
+
 def generate_summary(text):
     print('summary-chunk length', int(tk_len(text)))
     if(int(tk_len(text)) <= 3500):
         messages = [
             {"role": "system", "content": "You are a helpful assistant that extracts key information from text."},
-            {"role": "user", "content": f"Take notes from the text in form of bullet points (maintain the context) output atleast 200-400 words: \n\n\n{text}"}
+            {"role": "user", "content": f"Take notes from the text in form of bullet points (maintain the context) output atleast 200-400 words. Do: \n\n\n{text}"}
         ]
 
         response = openai.ChatCompletion.create(
@@ -107,13 +221,59 @@ def generate_summary(text):
         
         summary = response.choices[0].message['content'].strip()
         print('summary-chunk', summary)
-
+        with open("workspace/chunks.txt", "a", encoding='utf-8') as f:
+            f.write("\n\n\n" + summary)
         return summary
 
 
-def refineSummary(text):
-    print('used refine summary')   
-    prompt = f"this is the raw text that needs to be used to create a blog article in about 500 words. Add subheaders bullet points to make the article easily digestable. Maintain the context. Give the output in md format. Add line breaks after headers \n \n " + text
+def generate_context(text):
+    prompt = f"Generate context of this text in not more than 400 words that would be helpful in summarising texts.  Dont add a conclusion section since this is a middle part of long text summary \n \n " + text
+   
+    completion = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant that generates context of the text provided"},
+            {"role": "user", "content": prompt},         
+        ],  
+        n=1,
+        stop=None,
+        temperature=0.1,
+    )
+    context = completion.choices[0].message.content
+    print('generated context', context)
+    return context
+
+def refineSummaryChapters(text):
+    max_token_size = 3000 
+    text_chunks = chunk_text(text, max_token_size)
+
+    refinedSummary = []
+    prev_summary = refineSummary(text_chunks[0])
+    refinedSummary.append(prev_summary)
+    for chunk in text_chunks[1:]:
+        # generate context from summary 
+        context = generate_context(" ".join(refinedSummary))
+        
+        # refine text summary of chunks
+        refined_intermediate = refineSummary(chunk, context)
+        
+        # append summary to refined summary array
+        refinedSummary.append(refined_intermediate)
+
+    final_refined_summary = "\n\n ".join(refinedSummary) 
+    final_refined_summary = remove_conclusion(final_refined_summary)
+    print("Final summary", final_refined_summary)
+    return final_refined_summary    
+     
+            
+       
+
+def refineSummary(text, prev_context=None):
+    print('used refine summary')
+    if prev_context:
+        prompt = f"You are writing a summary of long text for me, here is the context of previous part of summary you wrote: {prev_context} \n\n. Now that you have the context, I will give you the next chunk of raw text. Generate summary of the raw text while maintaining the context in the form of a blog article in about 500 words. Add subheaders bullet points to make the article easily digestable. Maintain the context. Give the output in md format. Add line breaks after headers. Dont add a conclusion section since this is a middle part of long text summary. here is the text: \n\n {text}  "
+    else:
+        prompt = f"this is the raw text that needs to be used to create a blog article in about 500 words. Add subheaders bullet points to make the article easily digestable. Maintain the context. Give the output in md format. Add line breaks after headers \n \n " + text
     print('refining summary', prompt)
     print('refining summary token count', tk_len(prompt))
    
@@ -132,57 +292,19 @@ def refineSummary(text):
     return refined_summary
 
 
-def summarize_large_text(input_text, output_file):
-    # Chunk the text into smaller parts
-    input_text = input_text.replace('\n', '')
-    max_token_size = 3200 
-    text_chunks = chunk_text(input_text, max_token_size)
-   
-    print("max token size", max_token_size)
-    # split_index = len(text_chunks) // 2
-    # texts = [text_chunks[i:i+4] for i in range(0, len(text_chunks), 4)]
-    summaries = [generate_summary(chunk) for chunk in text_chunks]
-    # print(len(texts))
-    # summaries_array = []
-    # # Generate summaries for each chunk concurrently
-    # for text_array in texts:
-    #     with concurrent.futures.ThreadPoolExecutor() as executor:
-    #         summaries = list(executor.map(generate_summary, text_array))
-    #         summaries_array.append(summaries)
-    #         print('summaries',len(summaries))
-   
-    
-    # # Generate summaries for each chunk
-    # summaries = [generate_summary(chunk) for chunk in text_chunks]
-    # print('summaries',len(summaries_array))
-    # summaries_array = [item for sublist in summaries_array for item in sublist]
-
-    # Combine the summaries into a single article
-    article = "## Summary\n\n"
-    for idx, summary in enumerate(summaries, 1):
-        article +=  f" idx: {idx}:{summary}  \n\n"
-
-    token_limit = 3500
-    token_length = tk_len(article)
-    if int(token_length) > int(token_limit):
-        refinedSummary = summarize_large_text_langchain(article)
-    else:    
-        refinedSummary = summarize_large_text_langchain(article)
-    
-    print('refined summary', refinedSummary)
-    # Save the article to a Markdown file
-    # with open(output_file, "w", encoding='utf-8') as f:
-    #     f.write(refinedSummary)
-    return refinedSummary
 
 
+
+# Other unused functions
+#  =================================================================
+#  =================================================================
 def summarize_large_text_langchain(input_text, max_token_size=3200):
     print('used langchain summary')   
     text_chunks = chunk_text(input_text, max_token_size)
     print('chunks', len(text_chunks))
     docs = [Document(page_content=t) for t in text_chunks]
     print('chunks', len(docs))
-    prompt_template = """Summarize the following text like a section of blog article while maintaining the context of the conversation: 
+    prompt_template = """Take notes from the text in form of bullet points (maintain the context) output atleast 200-400 words: 
 
 
     {text}
@@ -202,7 +324,7 @@ def summarize_large_text_langchain(input_text, max_token_size=3200):
         input_variables=["existing_answer", "text"],
         template=refine_template,
     )
-    llm = ChatOpenAI(temperature=0.1, max_tokens=700, model_name="gpt-3.5-turbo", openai_api_key="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")
+    llm = ChatOpenAI(temperature=0.1, max_tokens=700, model_name="gpt-3.5-turbo", openai_api_key=os.environ["OPENAI_API_KEY"])
 
     chain = load_summarize_chain(llm,
         chain_type="refine", return_intermediate_steps=True, question_prompt=PROMPT, refine_prompt=refine_prompt)
