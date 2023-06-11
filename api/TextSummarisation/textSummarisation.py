@@ -167,7 +167,7 @@ def summarize_large_text(input_text, output_file):
     if int(token_length) > int(token_limit):
         refinedSummary = summarize_large_text_langchain(article)
     else:    
-        refinedSummary = refineSummary(article)
+        refinedSummary = summarize_large_text_langchain(article)
     
     print('refined summary', refinedSummary)
     # Save the article to a Markdown file
