@@ -111,18 +111,11 @@ def generate_summary(text, max_output):
 
 
 def refineSummary(text):
-    token_limit = 3500
-    token_length = tk_len(text)
-    if token_length > token_limit:
-       print('token-limit', token_limit, token_length)
-       text = text[:token_limit]
-       print('stripped', tk_len(text))
-   
-
-
+    print('used refine summary')   
     prompt = f"this is the raw text that needs to be used to create a blog article in about 500 words. Add subheaders bullet points to make the article easily digestable. Maintain the context. Give the output in md format. Add line breaks after headers \n \n " + text
     print('refining summary', prompt)
     print('refining summary token count', tk_len(prompt))
+   
     completion = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
         messages=[
@@ -169,8 +162,13 @@ def summarize_large_text(input_text, output_file):
     for idx, summary in enumerate(summaries, 1):
         article +=  f" idx: {idx}:{summary}  \n\n"
 
+    token_limit = 3500
+    token_length = tk_len(article)
+    if int(token_length) > int(token_limit):
+        refinedSummary = summarize_large_text_langchain(article)
+    else:    
+        refinedSummary = refineSummary(article)
     
-    refinedSummary = refineSummary(article)
     print('refined summary', refinedSummary)
     # Save the article to a Markdown file
     # with open(output_file, "w", encoding='utf-8') as f:
@@ -179,6 +177,7 @@ def summarize_large_text(input_text, output_file):
 
 
 def summarize_large_text_langchain(input_text, output_file, max_token_size=3200):
+    print('used langchain summary')   
     text_chunks = chunk_text(input_text, max_token_size)
     print('chunks', len(text_chunks))
     docs = [Document(page_content=t) for t in text_chunks]
@@ -192,7 +191,7 @@ def summarize_large_text_langchain(input_text, output_file, max_token_size=3200)
     CONCISE SUMMARY:"""
     PROMPT = PromptTemplate(template=prompt_template, input_variables=["text"])
     refine_template = (
-        "This is the raw text that needs to be summarised in the form of blog article while maintaining the context. Use headers and sections:\n"
+        "this is the raw text that needs to be used to create a blog article in about 500 words. Add subheaders bullet points to make the article easily digestable. Maintain the context. Give the output in md format. Add line breaks after headers \n\n"
         " {existing_answer}\n"
         "------------\n"
         "{text}\n"
@@ -209,9 +208,9 @@ def summarize_large_text_langchain(input_text, output_file, max_token_size=3200)
         chain_type="refine", return_intermediate_steps=True, question_prompt=PROMPT, refine_prompt=refine_prompt)
     results = chain({"input_documents": docs}, return_only_outputs=True)
     print(results)
-
-    with open(output_file, "w") as f:
-        f.write(results['output_text'])
+    return results['output_text']
+    # with open(output_file, "w") as f:
+    #     f.write(results['output_text'])
 
 
 def bart_summariser(transcript):
