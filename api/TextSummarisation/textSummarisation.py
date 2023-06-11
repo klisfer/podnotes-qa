@@ -176,7 +176,7 @@ def summarize_large_text(input_text, output_file):
     return refinedSummary
 
 
-def summarize_large_text_langchain(input_text, output_file, max_token_size=3200):
+def summarize_large_text_langchain(input_text, max_token_size=3200):
     print('used langchain summary')   
     text_chunks = chunk_text(input_text, max_token_size)
     print('chunks', len(text_chunks))
