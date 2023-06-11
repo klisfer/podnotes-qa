@@ -91,7 +91,7 @@ async def summarise_upload():
     summary = ''
     if 'file' in request.files :
          file = request.files['file']
-         userEmail = request.args.get("userEmail")
+         userEmail = request.form.get("userEmail")
 
          if file.filename == '':
             return 'No selected file', 400
