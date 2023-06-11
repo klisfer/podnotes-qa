@@ -88,7 +88,7 @@ def format_fixer(text):
     print('summary-chunk', formatted_text)
     return formatted_text
 
-def generate_summary(text, max_output):
+def generate_summary(text):
     
     messages = [
         {"role": "system", "content": "You are a helpful assistant that extracts key information from text."},
@@ -98,7 +98,7 @@ def generate_summary(text, max_output):
     response = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
         messages=messages,
-        max_tokens=max_output,  # Adjust based on your desired summary length
+        max_tokens=500,  # Adjust based on your desired summary length
         n=4,
         stop=None,
         temperature=0.1,
@@ -136,12 +136,11 @@ def summarize_large_text(input_text, output_file):
     input_text = input_text.replace('\n', '')
     max_token_size = 3200 
     text_chunks = chunk_text(input_text, max_token_size)
-    max_output = 3200/len(text_chunks)
-    max_output = math.ceil(max_output)
-    print("max token size", max_token_size, max_output)
+   
+    print("max token size", max_token_size)
     # split_index = len(text_chunks) // 2
     # texts = [text_chunks[i:i+4] for i in range(0, len(text_chunks), 4)]
-    summaries = [generate_summary(chunk, max_output) for chunk in text_chunks]
+    summaries = [generate_summary(chunk) for chunk in text_chunks]
     # print(len(texts))
     # summaries_array = []
     # # Generate summaries for each chunk concurrently
