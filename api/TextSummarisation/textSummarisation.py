@@ -89,25 +89,26 @@ def format_fixer(text):
     return formatted_text
 
 def generate_summary(text):
-    
-    messages = [
-        {"role": "system", "content": "You are a helpful assistant that extracts key information from text."},
-        {"role": "user", "content": f"Take notes from the text in form of bullet points (maintain the context) output atleast 200-400 words: \n\n\n{text}"}
-    ]
+    print('summary-chunk length', int(tk_len(text)))
+    if(int(tk_len(text)) <= 3500):
+        messages = [
+            {"role": "system", "content": "You are a helpful assistant that extracts key information from text."},
+            {"role": "user", "content": f"Take notes from the text in form of bullet points (maintain the context) output atleast 200-400 words: \n\n\n{text}"}
+        ]
 
-    response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
-        messages=messages,
-        max_tokens=500,  # Adjust based on your desired summary length
-        n=4,
-        stop=None,
-        temperature=0.1,
-    )
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=messages,
+            max_tokens=500,  # Adjust based on your desired summary length
+            n=4,
+            stop=None,
+            temperature=0.1,
+        )
+        
+        summary = response.choices[0].message['content'].strip()
+        print('summary-chunk', summary)
 
-    summary = response.choices[0].message['content'].strip()
-    print('summary-chunk', summary)
-
-    return summary
+        return summary
 
 
 def refineSummary(text):
