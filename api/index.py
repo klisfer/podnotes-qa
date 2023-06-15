@@ -103,7 +103,7 @@ async def summarise_upload():
             file_content = parse_file(os.path.join('/tmp', filename))
             
             print(file_content)
-            summary = textSummarisation.summarize_large_text(file_content, 'workspace/summary.md')
+            summary = textSummarisation.summarize_large_text_langchain(file_content, 'workspace/summary.md')
             print("uploaded summary", summary)
             save_db_results= await DBFunctions.save_summary(file_content, summary, userEmail)
             print(save_db_results)

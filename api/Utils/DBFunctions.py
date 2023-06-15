@@ -10,11 +10,13 @@ db = firestore.client()
 async def save_summary(content, summary, userEmail):
     user_ref = db.collection("knowledgebase").document(userEmail)
     user_doc = user_ref.get()
+    summary_context = summary['intermediate_steps']
+    summary = summary['output_text']
     # read summary file
     split_summary = summary.split('\n', 1)  # split the string at the first newline character
     title = split_summary[0]  # the first line is the title
     remaining_summary = split_summary[1] if len(split_summary) > 1 else ""
-    firestore_doc = [{ 'title': title, 'summary': remaining_summary, 'raw_text' : content , 'folder': 'inbox'}]
+    firestore_doc = [{ 'title': title, 'summary': remaining_summary, 'summary_context': summary_context, 'raw_text' : content , 'folder': 'inbox'}]
     if user_doc.exists:
         user_ref.update({'docs': firestore.ArrayUnion(firestore_doc)})
         print(f"Successfully added summary")

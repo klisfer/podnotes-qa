@@ -83,7 +83,7 @@ def format_fixer(text):
     ]
 
     response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
+        model="gpt-3.5-turbo-16k",
         messages=messages,
         max_tokens=700,  # Adjust based on your desired summary length
         n=1,
@@ -168,69 +168,67 @@ def remove_conclusion(text):
 def summarize_large_text(input_text, output_file):
     # Chunk the text into smaller parts
     input_text = input_text.replace('\n', '')
-    max_token_size = 3200 
+    max_token_size = 12000 
     text_chunks = chunk_text(input_text, max_token_size)
    
-    print("max token size", max_token_size)
+    print("max token size", max_token_size, tk_len(input_text))
     
-    # Create smaller groups of 4 chunks each
-    chunk_groups = [text_chunks[i:i+3] for i in range(0, len(text_chunks), 3)]
-   
-    all_summaries = []
-    # Generate summaries for each group of chunks concurrently
-    for group in chunk_groups:
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            summaries = list(executor.map(generate_summary, group))
-            all_summaries.extend(summaries)  # add the new summaries to our list
-            print('summaries', len(summaries))
+    if(len(text_chunks) > 1):
+        summaries = [generate_summary(chunk) for chunk in text_chunks]
+        print('summaries',len(summaries))
 
-    # Combine the summaries into a single article
-    article = "## Summary\n\n"
-    for idx, summary in enumerate(all_summaries, 1):  # enumerate starting from 1
-        article +=  f" idx: {idx}:{summary}  \n\n"
-
-    token_limit = 3500
-    token_length = tk_len(article)
-    if int(token_length) > int(token_limit):
-        refinedSummary = refineSummaryChapters(article)
-    else:    
+        # Combine the summaries into a single article
+        article = "## Summary\n\n"
+        for idx, summary in enumerate(summaries):  # enumerate starting from 1
+            article +=  f" idx: {idx}:{summary}  \n\n"
         refinedSummary = refineSummary(article)
-    
-    print('refined summary', refinedSummary)
+        
+        response_obj = {
+            'output_text': refinedSummary,
+            'intermediate_steps': article 
+        }
+    else:
+        refinedSummary = refineSummary(input_text)
+        response_obj = {
+            'output_text': refinedSummary,
+            'intermediate_steps': input_text 
+        }       
+    print('refined summary', response_obj)
     # Save the article to a Markdown file
     # with open(output_file, "w", encoding='utf-8') as f:
     #     f.write(refinedSummary)
-    return refinedSummary
+   
+    return response_obj
 
 def generate_summary(text):
     print('summary-chunk length', int(tk_len(text)))
-    if(int(tk_len(text)) <= 3500):
-        messages = [
-            {"role": "system", "content": "You are a helpful assistant that extracts key information from text."},
-            {"role": "user", "content": f"Take notes from the text in form of bullet points (maintain the context) output atleast 200-400 words. Do: \n\n\n{text}"}
-        ]
+    
+    messages = [
+        {"role": "system", "content": "You are a helpful assistant that extracts key information from text."},
+        {"role": "user", "content": f"Take notes from the text in form of bullet points (maintain the context) Extract as much information as possible that will be helpul in summarising the text later: \n\n\n{text}"}
+    ]
 
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=messages,
-            max_tokens=500,  # Adjust based on your desired summary length
-            n=4,
-            stop=None,
-            temperature=0.1,
-        )
-        
-        summary = response.choices[0].message['content'].strip()
-        print('summary-chunk', summary)
-        with open("workspace/chunks.txt", "a", encoding='utf-8') as f:
-            f.write("\n\n\n" + summary)
-        return summary
+    response = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo-16k",
+        messages=messages,
+        max_tokens=3500,  # Adjust based on your desired summary length
+        n=4,
+        stop=None,
+        temperature=0.1,
+    )
+    
+    summary = response.choices[0].message['content'].strip()
+    print('summary-chunk', summary)
+    with open("workspace/chunks.txt", "a", encoding='utf-8') as f:
+        f.write("\n\n\n" + summary)
+    return summary
 
 
 def generate_context(text):
     prompt = f"Generate context of this text in not more than 400 words that would be helpful in summarising texts.  Dont add a conclusion section since this is a middle part of long text summary \n \n " + text
    
     completion = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
+        model="gpt-3.5-turbo-16k",
         messages=[
             {"role": "system", "content": "You are a helpful assistant that generates context of the text provided"},
             {"role": "user", "content": prompt},         
@@ -268,17 +266,17 @@ def refineSummaryChapters(text):
             
        
 
-def refineSummary(text, prev_context=None):
+def refineSummary(text):
     print('used refine summary')
-    if prev_context:
-        prompt = f"You are writing a summary of long text for me, here is the context of previous part of summary you wrote: {prev_context} \n\n. Now that you have the context, I will give you the next chunk of raw text. Generate summary of the raw text while maintaining the context in the form of a blog article in about 500 words. Add subheaders bullet points to make the article easily digestable. Maintain the context. Give the output in md format. Add line breaks after headers. Dont add a conclusion section since this is a middle part of long text summary. here is the text: \n\n {text}  "
-    else:
-        prompt = f"this is the raw text that needs to be used to create a blog article in about 500 words. Add subheaders bullet points to make the article easily digestable. Maintain the context. Give the output in md format. Add line breaks after headers \n \n " + text
+    # if prev_context:
+    #     prompt = f"You are writing a summary of long text for me, here is the context of previous part of summary you wrote: {prev_context} \n\n. Now that you have the context, I will give you the next chunk of raw text. Generate summary of the raw text while maintaining the context in the form of a blog article in about 500 words. Add subheaders bullet points to make the article easily digestable. Maintain the context. Give the output in md format. Add line breaks after headers. Dont add a conclusion section since this is a middle part of long text summary. here is the text: \n\n {text}  "
+    # else:
+    prompt = f"this is the raw text that needs to be used to create a blog article in about 500-700 words. Use subheaders and bullet points wherever required to make the article easily digestable. Maintain the context. Give the output in md format. Add line breaks after headers \n \n " + text
     print('refining summary', prompt)
     print('refining summary token count', tk_len(prompt))
    
     completion = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
+        model="gpt-3.5-turbo-16k",
         messages=[
             {"role": "system", "content": "You are a helpful assistant that generates blog articles based on text provided"},
             {"role": "user", "content": prompt},         
@@ -298,13 +296,13 @@ def refineSummary(text, prev_context=None):
 # Other unused functions
 #  =================================================================
 #  =================================================================
-def summarize_large_text_langchain(input_text, max_token_size=3200):
+def summarize_large_text_langchain(input_text, max_token_size=13200):
     print('used langchain summary')   
     text_chunks = chunk_text(input_text, max_token_size)
     print('chunks', len(text_chunks))
     docs = [Document(page_content=t) for t in text_chunks]
     print('chunks', len(docs))
-    prompt_template = """Take notes from the text in form of bullet points (maintain the context) output atleast 200-400 words: 
+    prompt_template = """Take notes from the text in form of bullet points (maintain the context) output atleast 700-800 words. Extract as much information as possible that will be useful for summarising the text later: 
 
 
     {text}
@@ -313,7 +311,7 @@ def summarize_large_text_langchain(input_text, max_token_size=3200):
     CONCISE SUMMARY:"""
     PROMPT = PromptTemplate(template=prompt_template, input_variables=["text"])
     refine_template = (
-        "this is the raw text that needs to be used to create a blog article in about 500 words. Add subheaders bullet points to make the article easily digestable. Maintain the context. Give the output in md format. Add line breaks after headers \n\n"
+        "this is the raw text that needs to be used to create a blog article which is a 10 min read. Add subheaders bullet points to make the article easily digestable. Maintain the context. Give the output in md format. Add line breaks after headers \n\n"
         " {existing_answer}\n"
         "------------\n"
         "{text}\n"
@@ -324,13 +322,13 @@ def summarize_large_text_langchain(input_text, max_token_size=3200):
         input_variables=["existing_answer", "text"],
         template=refine_template,
     )
-    llm = ChatOpenAI(temperature=0.1, max_tokens=700, model_name="gpt-3.5-turbo", openai_api_key=os.environ["OPENAI_API_KEY"])
+    llm = ChatOpenAI(temperature=0.1, max_tokens=2500, model_name="gpt-3.5-turbo-16k", openai_api_key=os.environ["OPENAI_API_KEY"])
 
     chain = load_summarize_chain(llm,
         chain_type="refine", return_intermediate_steps=True, question_prompt=PROMPT, refine_prompt=refine_prompt)
     results = chain({"input_documents": docs}, return_only_outputs=True)
     print(results)
-    return results['output_text']
+    return results
     # with open(output_file, "w") as f:
     #     f.write(results['output_text'])
 
