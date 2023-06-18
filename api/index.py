@@ -194,7 +194,7 @@ async def summarise_media_upload():
         delete_if_exists('workspace/media.ts.txt')
         # transcribe audio using powershell script
         try:
-            result = subprocess.run(
+            result = await subprocess.run(
                 ["pwsh", "-Command", "-ExecutionPolicy", "Bypass", "-File", "api/Scripts/transcribe.ps1"],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -202,20 +202,22 @@ async def summarise_media_upload():
                 check=True,
             )
             print("Output:", result)
+
+            text_summary = ''
+            with open('workspace/media.txt', 'r') as file:
+                content = file.read()
+                text_summary = textSummarisation.summarize_large_text(content, 'workspace/summary.md')
+        
+            save_db_results= await DBFunctions.save_summary(content, text_summary, userEmail)
+        
+            return text_summary , 200
+
         except subprocess.CalledProcessError as error:
             print(f"Error occurred: {error}")
-
+            return error
 
         #load transcript and summarise text and save to firestore
-        text_summary = ''
-        with open('workspace/media.txt', 'r') as file:
-            content = file.read()
-            text_summary = textSummarisation.summarize_large_text(content, 'workspace/summary.md')
-        
-        save_db_results= await DBFunctions.save_summary(content, text_summary, userEmail)
-        
-        return text_summary , 200
-
+      
   
   
 
