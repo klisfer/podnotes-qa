@@ -114,11 +114,6 @@ async def summarise_upload():
     return summary
 
         
-    # with open('workspace/episode.txt', 'r') as file:
-    #     contents = file.read()
-    #     summary = textSummarisation.summarize_large_text(contents.replace('\n',''), 'workspace/summary.txt')
-    return summary
-
 
 @app.route("/summarise-media", methods=['GET'])
 async def summarise_media_url():
@@ -175,7 +170,7 @@ async def summarise_media_upload():
          userEmail = request.form.get("userEmail")
          if file:
             filename = secure_filename(file.filename)
-            filepath = os.path.join(app.config['workspace'], filename)
+            filepath = os.path.join('workspace', filename)
             file.save(filepath)
 
             mimetype = mimetypes.guess_type(filepath)[0]
