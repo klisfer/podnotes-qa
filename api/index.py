@@ -182,39 +182,39 @@ async def summarise_media_upload():
                 audioclip = AudioFileClip(filepath)
                 audioclip.write_audiofile(audio_filepath)
                 os.remove(filepath)  # delete the original video file
+                print('file downloaded')
 
-                return 'Video file uploaded and converted to mp3 successfully', 200
+                # delete transcripts if it exists 
+                delete_if_exists('workspace/media.txt')
+                delete_if_exists('workspace/media.ts.txt')
+                # transcribe audio using powershell script
+                try:
+                    result = subprocess.run(
+                        ["powershell.exe", "-ExecutionPolicy", "Bypass", "-File", "api/Scripts/transcribe.ps1"],
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True,
+                        check=True,
+                    )
+                    print("Output:", result)
+                except subprocess.CalledProcessError as error:
+                    print(f"Error occurred: {error}")
+
+
+                #load transcript and summarise text and save to firestore
+                text_summary = ''
+                with open('workspace/media.txt', 'r') as file:
+                    content = file.read()
+                    text_summary = textSummarisation.summarize_large_text(content, 'workspace/summary.md')
+                
+                save_db_results= await DBFunctions.save_summary(content, text_summary, userEmail)
+
+                
+                return text_summary , 200  
             else:
                 return 'File uploaded successfully', 200
 
-    print('file downloaded')
-
-    # delete transcripts if it exists 
-    delete_if_exists('workspace/media.txt')
-    delete_if_exists('workspace/media.ts.txt')
-    # transcribe audio using powershell script
-    try:
-        result = subprocess.run(
-            ["powershell.exe", "-ExecutionPolicy", "Bypass", "-File", "api/Scripts/transcribe.ps1"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            check=True,
-        )
-        print("Output:", result)
-    except subprocess.CalledProcessError as error:
-        print(f"Error occurred: {error}")
-
-
-    #load transcript and summarise text and save to firestore
-    text_summary = ''
-    with open('workspace/media.txt', 'r') as file:
-        content = file.read()
-        text_summary = textSummarisation.summarize_large_text(content, 'workspace/summary.md')
-    
-    save_db_results= await DBFunctions.save_summary(content, text_summary, userEmail)
-
-    return text_summary  
+  
   
 
 # Util functions
