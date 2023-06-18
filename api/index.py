@@ -165,54 +165,56 @@ async def summarise_media_upload():
 
     # get url from query params and download media
     userEmail = request.args.get("userEmail")
-    if 'file' in request.files :
-         file = request.files['file']
-         userEmail = request.form.get("userEmail")
-         if file:
-            filename = secure_filename(file.filename)
-            filepath = os.path.join('workspace', filename)
+
+    file = request.files['file']
+    if file:
+        filename = secure_filename(file.filename)
+        filepath = os.path.join('workspace', filename)
+
+        mimetype = mimetypes.guess_type(filepath)[0]
+
+        if mimetype and mimetype.startswith('video'):
             file.save(filepath)
+            audio_filename = 'media' + '.mp3'
+            audio_filepath = os.path.join(app.config['workspace'], audio_filename)
 
-            mimetype = mimetypes.guess_type(filepath)[0]
+            audioclip = AudioFileClip(filepath)
+            audioclip.write_audiofile(audio_filepath)
+            os.remove(filepath)  # delete the original video file
+            print('file downloaded')
 
-            if mimetype and mimetype.startswith('video'):
-                audio_filename = 'media' + '.mp3'
-                audio_filepath = os.path.join(app.config['workspace'], audio_filename)
-
-                audioclip = AudioFileClip(filepath)
-                audioclip.write_audiofile(audio_filepath)
-                os.remove(filepath)  # delete the original video file
-                print('file downloaded')
-
-                # delete transcripts if it exists 
-                delete_if_exists('workspace/media.txt')
-                delete_if_exists('workspace/media.ts.txt')
-                # transcribe audio using powershell script
-                try:
-                    result = subprocess.run(
-                        ["powershell.exe", "-ExecutionPolicy", "Bypass", "-File", "api/Scripts/transcribe.ps1"],
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
-                        text=True,
-                        check=True,
-                    )
-                    print("Output:", result)
-                except subprocess.CalledProcessError as error:
-                    print(f"Error occurred: {error}")
+              
+        elif mimetype and mimetype.startswith('audio'):
+            path = os.path.join('workspace', 'media.mp3')
+            file.save(path)
 
 
-                #load transcript and summarise text and save to firestore
-                text_summary = ''
-                with open('workspace/media.txt', 'r') as file:
-                    content = file.read()
-                    text_summary = textSummarisation.summarize_large_text(content, 'workspace/summary.md')
-                
-                save_db_results= await DBFunctions.save_summary(content, text_summary, userEmail)
+        # delete transcripts if it exists 
+        delete_if_exists('workspace/media.txt')
+        delete_if_exists('workspace/media.ts.txt')
+        # transcribe audio using powershell script
+        try:
+            result = subprocess.run(
+                ["powershell.exe", "-ExecutionPolicy", "Bypass", "-File", "api/Scripts/transcribe.ps1"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                check=True,
+            )
+            print("Output:", result)
+        except subprocess.CalledProcessError as error:
+            print(f"Error occurred: {error}")
 
-                
-                return text_summary , 200  
-            else:
-                return 'File uploaded successfully', 200
+
+        #load transcript and summarise text and save to firestore
+        text_summary = ''
+        with open('workspace/media.txt', 'r') as file:
+            content = file.read()
+            text_summary = textSummarisation.summarize_large_text(content, 'workspace/summary.md')
+        
+        save_db_results= await DBFunctions.save_summary(content, text_summary, userEmail)
+        
+        return text_summary , 200
 
   
   
