@@ -195,7 +195,7 @@ async def summarise_media_upload():
         # transcribe audio using powershell script
         try:
             result = subprocess.run(
-                ["powershell", "-Command", "-ExecutionPolicy", "Bypass", "-File", "api/Scripts/transcribe.ps1"],
+                ["pwsh", "-Command", "-ExecutionPolicy", "Bypass", "-File", "api/Scripts/transcribe.ps1"],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
