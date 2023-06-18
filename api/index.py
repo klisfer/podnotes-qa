@@ -10,7 +10,11 @@ import os
 from docx import Document
 from werkzeug.utils import secure_filename
 from flask_cors import CORS
+import subprocess
 from dotenv import load_dotenv
+from pytube import YouTube
+from moviepy.editor import AudioFileClip
+import mimetypes
 load_dotenv()
 
 app = Flask(__name__)
@@ -97,10 +101,10 @@ async def summarise_upload():
             return 'No selected file', 400
          if file:
             filename = secure_filename(file.filename)
-            print(os.path.join('/tmp', filename), userEmail)
-            file.save(os.path.join('/tmp', filename))
+            print(os.path.join('/workspace', filename), userEmail)
+            file.save(os.path.join('/workspace', filename))
             
-            file_content = parse_file(os.path.join('/tmp', filename))
+            file_content = parse_file(os.path.join('/workspace', filename))
             
             print(file_content)
             summary = textSummarisation.summarize_large_text_langchain(file_content, 'workspace/summary.md')
@@ -114,6 +118,119 @@ async def summarise_upload():
     #     contents = file.read()
     #     summary = textSummarisation.summarize_large_text(contents.replace('\n',''), 'workspace/summary.txt')
     return summary
+
+
+@app.route("/summarise-media", methods=['GET'])
+async def summarise_media_url():
+
+    # get url from query params and download media
+    media_url = request.args.get("url")
+    userEmail = request.args.get("userEmail")
+    print("url is", media_url)
+    if 'youtube' in media_url:
+        download_video(media_url)
+    else:
+        audio_file = requests.get(media_url)
+        print(audio_file.status_code,  userEmail)
+        if audio_file.status_code == 200:
+            with open('workspace/media.mp3', "wb") as file:
+                file.write(audio_file.content)
+
+    print('file downloaded')
+
+    # delete transcripts if it exists 
+    delete_if_exists('workspace/media.txt')
+    delete_if_exists('workspace/media.ts.txt')
+    # transcribe audio using powershell script
+    try:
+        result = subprocess.run(
+            ["powershell.exe", "-ExecutionPolicy", "Bypass", "-File", "api/Scripts/transcribe.ps1"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=True,
+        )
+        print("Output:", result)
+    except subprocess.CalledProcessError as error:
+        print(f"Error occurred: {error}")
+
+
+    #load transcript and summarise text and save to firestore
+    text_summary = ''
+    with open('workspace/media.txt', 'r') as file:
+        content = file.read()
+        text_summary = textSummarisation.summarize_large_text(content, 'workspace/summary.md')
+    
+    save_db_results= await DBFunctions.save_summary(content, text_summary, userEmail)
+
+    return text_summary  
+  
+@app.route("/summarise-media", methods=['POST'])
+async def summarise_media_upload():
+
+    # get url from query params and download media
+    userEmail = request.args.get("userEmail")
+    if 'file' in request.files :
+         file = request.files['file']
+         userEmail = request.form.get("userEmail")
+         if file:
+            filename = secure_filename(file.filename)
+            filepath = os.path.join(app.config['workspace'], filename)
+            file.save(filepath)
+
+            mimetype = mimetypes.guess_type(filepath)[0]
+
+            if mimetype and mimetype.startswith('video'):
+                audio_filename = 'media' + '.mp3'
+                audio_filepath = os.path.join(app.config['workspace'], audio_filename)
+
+                audioclip = AudioFileClip(filepath)
+                audioclip.write_audiofile(audio_filepath)
+                os.remove(filepath)  # delete the original video file
+
+                return 'Video file uploaded and converted to mp3 successfully', 200
+            else:
+                return 'File uploaded successfully', 200
+
+    print('file downloaded')
+
+    # delete transcripts if it exists 
+    delete_if_exists('workspace/media.txt')
+    delete_if_exists('workspace/media.ts.txt')
+    # transcribe audio using powershell script
+    try:
+        result = subprocess.run(
+            ["powershell.exe", "-ExecutionPolicy", "Bypass", "-File", "api/Scripts/transcribe.ps1"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=True,
+        )
+        print("Output:", result)
+    except subprocess.CalledProcessError as error:
+        print(f"Error occurred: {error}")
+
+
+    #load transcript and summarise text and save to firestore
+    text_summary = ''
+    with open('workspace/media.txt', 'r') as file:
+        content = file.read()
+        text_summary = textSummarisation.summarize_large_text(content, 'workspace/summary.md')
+    
+    save_db_results= await DBFunctions.save_summary(content, text_summary, userEmail)
+
+    return text_summary  
+  
+
+# Util functions
+#  =================================================================
+#  =================================================================
+def delete_if_exists(file_path):
+    """Delete the file at `file_path` if it exists."""
+    if os.path.isfile(file_path):
+        os.remove(file_path)
+        
+
 
 def parse_file(filepath):
     file_extension = os.path.splitext(filepath)[1]
@@ -153,5 +270,17 @@ def read_file_contents(blob):
     return blob.download_as_text()
 
 
+def download_video(video_url):
+    video = YouTube(video_url)
+    stream = video.streams.get_lowest_resolution()
+    filename = 'workspace/media'
+    stream.download(filename=filename)
+    print('downloaded video, converting to audio')
+    # convert video to mp3 using moviepy
+    video_clip = AudioFileClip(filename + '.mp4')
+    video_clip.to_audiofile(filename + '.mp3')
+    video_clip.close()
+    print('saved audio')
+ 
 if __name__ == "__main__":
     app.run(debug=False, use_reloader=False, host="0.0.0.0",port=5000)

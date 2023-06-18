@@ -24,3 +24,10 @@ models/ggml-stable-vicuna-13B.q4_2.bin
 models/llama-30b-ggml-model-q4_0.bin
 development.pem
 api_key_openai.txt
+alchemist.pdf
+attention.pdf
+media
+workspace/media.ts.txt
+.gitignore
+workspace/episode.txt
+workspace/chunks.txt

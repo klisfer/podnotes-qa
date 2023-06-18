@@ -168,24 +168,38 @@ def remove_conclusion(text):
 def summarize_large_text(input_text, output_file):
     # Chunk the text into smaller parts
     input_text = input_text.replace('\n', '')
-    max_token_size = 12000 
+    input_token_length = tk_len(input_text)
+
+    if input_token_length > 20000:
+        max_token_size = 12500
+    else:
+        max_token_size = 3500     
+    
     text_chunks = chunk_text(input_text, max_token_size)
    
     print("max token size", max_token_size, tk_len(input_text))
     
     if(len(text_chunks) > 1):
-        summaries = [generate_summary(chunk) for chunk in text_chunks]
-        print('summaries',len(summaries))
+        # summaries = [generate_summary(chunk) for chunk in text_chunks]
+        # print('summaries',len(summaries))
 
-        # Combine the summaries into a single article
-        article = "## Summary\n\n"
-        for idx, summary in enumerate(summaries):  # enumerate starting from 1
-            article +=  f" idx: {idx}:{summary}  \n\n"
-        refinedSummary = refineSummary(article)
+        # # Combine the summaries into a single article
+        # article = "## Summary\n\n"
+        # for idx, summary in enumerate(summaries):  # enumerate starting from 1
+        #     article +=  f" idx: {idx}:{summary}  \n\n"
+        summaries_array = []
+        texts = [text_chunks[i:i+3] for i in range(0, len(text_chunks), 3)]
+        for text_array in texts:
+         with concurrent.futures.ThreadPoolExecutor() as executor:
+            summaries = list(executor.map(generate_summary, text_array))
+            summaries_array = summaries
+            print('summaries', summaries)
+            
+        refinedSummary = refineSummary(' '.join(summaries_array))
         
         response_obj = {
             'output_text': refinedSummary,
-            'intermediate_steps': article 
+            'intermediate_steps': ' '.join(summaries_array)
         }
     else:
         refinedSummary = refineSummary(input_text)
@@ -202,21 +216,29 @@ def summarize_large_text(input_text, output_file):
 
 def generate_summary(text):
     print('summary-chunk length', int(tk_len(text)))
-    
+    text_token_length = tk_len(text)
     messages = [
         {"role": "system", "content": "You are a helpful assistant that extracts key information from text."},
         {"role": "user", "content": f"Take notes from the text in form of bullet points (maintain the context) Extract as much information as possible that will be helpul in summarising the text later: \n\n\n{text}"}
     ]
-
-    response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo-16k",
-        messages=messages,
-        max_tokens=3500,  # Adjust based on your desired summary length
-        n=4,
-        stop=None,
-        temperature=0.1,
-    )
-    
+    if text_token_length > 4000:
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo-16k",
+            messages=messages,
+            max_tokens=3500,
+            n=4,
+            stop=None,
+            temperature=0.1,
+        )
+    else: 
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=messages,
+            max_tokens=500,  
+            n=4,
+            stop=None,
+            temperature=0.1,
+        )
     summary = response.choices[0].message['content'].strip()
     print('summary-chunk', summary)
     with open("workspace/chunks.txt", "a", encoding='utf-8') as f:
@@ -224,67 +246,37 @@ def generate_summary(text):
     return summary
 
 
-def generate_context(text):
-    prompt = f"Generate context of this text in not more than 400 words that would be helpful in summarising texts.  Dont add a conclusion section since this is a middle part of long text summary \n \n " + text
-   
-    completion = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo-16k",
-        messages=[
-            {"role": "system", "content": "You are a helpful assistant that generates context of the text provided"},
-            {"role": "user", "content": prompt},         
-        ],  
-        n=1,
-        stop=None,
-        temperature=0.1,
-    )
-    context = completion.choices[0].message.content
-    print('generated context', context)
-    return context
-
-def refineSummaryChapters(text):
-    max_token_size = 3000 
-    text_chunks = chunk_text(text, max_token_size)
-
-    refinedSummary = []
-    prev_summary = refineSummary(text_chunks[0])
-    refinedSummary.append(prev_summary)
-    for chunk in text_chunks[1:]:
-        # generate context from summary 
-        context = generate_context(" ".join(refinedSummary))
-        
-        # refine text summary of chunks
-        refined_intermediate = refineSummary(chunk, context)
-        
-        # append summary to refined summary array
-        refinedSummary.append(refined_intermediate)
-
-    final_refined_summary = "\n\n ".join(refinedSummary) 
-    final_refined_summary = remove_conclusion(final_refined_summary)
-    print("Final summary", final_refined_summary)
-    return final_refined_summary    
-     
-            
-       
-
 def refineSummary(text):
     print('used refine summary')
     # if prev_context:
     #     prompt = f"You are writing a summary of long text for me, here is the context of previous part of summary you wrote: {prev_context} \n\n. Now that you have the context, I will give you the next chunk of raw text. Generate summary of the raw text while maintaining the context in the form of a blog article in about 500 words. Add subheaders bullet points to make the article easily digestable. Maintain the context. Give the output in md format. Add line breaks after headers. Dont add a conclusion section since this is a middle part of long text summary. here is the text: \n\n {text}  "
     # else:
-    prompt = f"this is the raw text that needs to be used to create a blog article in about 500-700 words. Use subheaders and bullet points wherever required to make the article easily digestable. Maintain the context. Give the output in md format. Add line breaks after headers \n \n " + text
+    prompt = f"this is the raw text that needs to be formatted in the form of a blog article of close to number of words in the token. Use subheaders and bullet points wherever required to make the article easily digestable. Maintain the context. Give the output in md format. Add line breaks after headers \n \n " + text
     print('refining summary', prompt)
     print('refining summary token count', tk_len(prompt))
-   
-    completion = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo-16k",
-        messages=[
-            {"role": "system", "content": "You are a helpful assistant that generates blog articles based on text provided"},
-            {"role": "user", "content": prompt},         
-        ],  
-        n=1,
-        stop=None,
-        temperature=0.1,
-    )
+    prompt_token_length = tk_len(prompt)
+    if(prompt_token_length > 3500):
+        completion = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo-16k",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant that generates summary in form of blog articles based on text provided"},
+                {"role": "user", "content": prompt},         
+            ],  
+            n=1,
+            stop=None,
+            temperature=0.1,
+        )
+    else:
+        completion = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant that generates summary in form of blog articles based on text provided"},
+                {"role": "user", "content": prompt},         
+            ],  
+            n=1,
+            stop=None,
+            temperature=0.1,
+        )    
     refined_summary = completion.choices[0].message.content
     print('refined summary', refined_summary)
     return refined_summary
@@ -366,3 +358,45 @@ def bart_summariser(transcript):
     except Exception as e:
         print("following error occured with bart summarised", e)        
 
+
+def generate_context(text):
+    prompt = f"Generate context of this text in not more than 400 words that would be helpful in summarising texts.  Dont add a conclusion section since this is a middle part of long text summary \n \n " + text
+   
+    completion = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo-16k",
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant that generates context of the text provided"},
+            {"role": "user", "content": prompt},         
+        ],  
+        n=1,
+        stop=None,
+        temperature=0.1,
+    )
+    context = completion.choices[0].message.content
+    print('generated context', context)
+    return context
+
+def refineSummaryChapters(text):
+    max_token_size = 3000 
+    text_chunks = chunk_text(text, max_token_size)
+
+    refinedSummary = []
+    prev_summary = refineSummary(text_chunks[0])
+    refinedSummary.append(prev_summary)
+    for chunk in text_chunks[1:]:
+        # generate context from summary 
+        context = generate_context(" ".join(refinedSummary))
+        
+        # refine text summary of chunks
+        refined_intermediate = refineSummary(chunk, context)
+        
+        # append summary to refined summary array
+        refinedSummary.append(refined_intermediate)
+
+    final_refined_summary = "\n\n ".join(refinedSummary) 
+    final_refined_summary = remove_conclusion(final_refined_summary)
+    print("Final summary", final_refined_summary)
+    return final_refined_summary    
+     
+            
+       
